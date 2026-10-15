@@ -481,7 +481,7 @@ setToday();setCourseDateDefaults();renderAll();
  document.getElementById('taResetPassword').addEventListener('click',async()=>{
   if(!client)return;
   const email=document.getElementById('taEmail').value.trim();if(!email){msg.textContent='Primero escribí tu correo electrónico.';return;}
-  try{const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:new URL('./',location.href).origin+new URL('./',location.href).pathname});if(error)throw error;msg.textContent='Si la cuenta existe, Supabase enviará un correo. Abrí el enlace recibido para elegir una contraseña nueva.'}
+  try{const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});if(error)throw error;msg.textContent='Si la cuenta existe, Supabase enviará un correo. Abrí el enlace recibido para elegir una contraseña nueva.'}
   catch(e){msg.textContent='No se pudo solicitar recuperación: '+errorText(e)}
  });
  recoveryForm.addEventListener('submit',async e=>{
