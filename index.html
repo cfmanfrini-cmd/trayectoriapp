@@ -48,6 +48,7 @@
 <label for="taPassword">Contraseña</label><input type="password" id="taPassword" autocomplete="current-password" required>
 <button type="submit" id="taLoginButton">Ingresar</button></form>
 <button class="taLink" id="taResetPassword" type="button">Solicitar recuperación de contraseña</button>
+<form id="taRecoveryForm" hidden style="margin-top:14px"><label for="taNewPassword">Nueva contraseña (mínimo 8 caracteres)</label><input type="password" id="taNewPassword" autocomplete="new-password" minlength="8" required><label for="taConfirmPassword">Repetí la contraseña nueva</label><input type="password" id="taConfirmPassword" autocomplete="new-password" minlength="8" required><button type="submit" id="taRecoverySubmit">Guardar contraseña nueva</button></form>
 <p id="taAuthMessage" role="alert"></p><p style="font-size:12px;color:#52677a">No ingreses información real de estudiantes hasta verificar el acceso y la privacidad. La aplicación necesita Internet para iniciar sesión y sincronizar.</p></div></section>
 <div id="taCloudBar" hidden><span id="taCloudStatus">Conectando…</span><button id="taLogout" type="button">Cerrar sesión</button></div>
 <header>
@@ -55,7 +56,7 @@
   <button class="secondary no-print" id="installBtn" hidden>Instalar aplicación</button>
 </header>
 <main class="wrap">
-  <div class="notice no-print"><strong>TrayectoriApp v13 · Prueba de sincronización:</strong> los cambios se guardan en Supabase al iniciar sesión. Conservá copias JSON y usá datos ficticios hasta comprobar la seguridad. Si usás dos dispositivos, terminá de guardar en uno antes de editar en el otro.</div>
+  <div class="notice no-print"><strong>TrayectoriApp v14 · Sincronización:</strong> los cambios se guardan en Supabase al iniciar sesión. Conservá copias JSON y usá datos ficticios hasta comprobar la seguridad. Si usás dos dispositivos, terminá de guardar en uno antes de editar en el otro.</div>
   <nav class="tabs no-print" aria-label="Secciones">
     <button class="tab active" data-tab="home">Resumen</button>
     <button class="tab" data-tab="schools">Escuelas y cursos</button>
@@ -401,6 +402,9 @@ setToday();setCourseDateDefaults();renderAll();
  const loginButton=document.getElementById('taLoginButton');
  const blank=()=>({schools:[],courses:[],students:[],attendance:[],grades:[],gradeInstances:[],notes:[],closures:[]});
  let client=null,user=null,revision=null,timer=null,writing=false,queued=false,dirty=false,locked=false;
+ const recoveryForm=document.getElementById('taRecoveryForm');
+ let recovering=new URLSearchParams(location.hash.slice(1)).get('type')==='recovery';
+ function showRecovery(){recovering=true;document.getElementById('taLoginForm').hidden=true;document.getElementById('taResetPassword').hidden=true;recoveryForm.hidden=false;auth.hidden=false;bar.hidden=true;msg.textContent='Elegí una contraseña nueva para tu cuenta.';}
  const setStatus=t=>{status.textContent=t};
  const errorText=e=>e?.message||String(e);
  const cloudError=e=>{setStatus('⚠️ Sin sincronizar: '+errorText(e));console.error('Error de sincronización',e)};
@@ -460,10 +464,12 @@ setToday();setCourseDateDefaults();renderAll();
  async function start(){
   if(!window.supabase?.createClient){msg.textContent='No se pudo cargar la conexión con Supabase. Comprobá Internet y volvé a abrir la aplicación.';return;}
   client=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  client.auth.onAuthStateChange((event)=>{if(event==='PASSWORD_RECOVERY')showRecovery();});
   const {data:sessionData,error}=await client.auth.getSession();
   if(error)msg.textContent=errorText(error);
-  if(sessionData?.session?.user)await enter(sessionData.session.user);
-  else msg.textContent='Ingresá con el correo y la contraseña de tu usuario de TrayectoriApp.';
+  if(recovering && sessionData?.session?.user)showRecovery();
+  else if(sessionData?.session?.user)await enter(sessionData.session.user);
+  else msg.textContent=recovering?'El enlace de recuperación venció o no es válido. Solicitá uno nuevo.':'Ingresá con el correo y la contraseña de tu usuario de TrayectoriApp.';
  }
  document.getElementById('taLoginForm').addEventListener('submit',async e=>{
   e.preventDefault();if(!client){msg.textContent='No hay conexión con Supabase.';return;}
@@ -475,8 +481,25 @@ setToday();setCourseDateDefaults();renderAll();
  document.getElementById('taResetPassword').addEventListener('click',async()=>{
   if(!client)return;
   const email=document.getElementById('taEmail').value.trim();if(!email){msg.textContent='Primero escribí tu correo electrónico.';return;}
-  try{const {error}=await client.auth.resetPasswordForEmail(email);if(error)throw error;msg.textContent='Si la cuenta existe, Supabase enviará un correo. Para completar la recuperación puede ser necesario configurar la URL de la aplicación publicada.'}
+  try{const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:new URL('./',location.href).origin+new URL('./',location.href).pathname});if(error)throw error;msg.textContent='Si la cuenta existe, Supabase enviará un correo. Abrí el enlace recibido para elegir una contraseña nueva.'}
   catch(e){msg.textContent='No se pudo solicitar recuperación: '+errorText(e)}
+ });
+ recoveryForm.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const p=document.getElementById('taNewPassword').value;
+  if(p!==document.getElementById('taConfirmPassword').value){msg.textContent='Las contraseñas no coinciden.';return;}
+  const button=document.getElementById('taRecoverySubmit');button.disabled=true;
+  try{
+   const {error}=await client.auth.updateUser({password:p});if(error)throw error;
+   await client.auth.signOut();recovering=false;
+   history.replaceState(null,'',location.pathname+location.search);
+   recoveryForm.hidden=true;document.getElementById('taLoginForm').hidden=false;
+   document.getElementById('taResetPassword').hidden=false;
+   document.getElementById('taPassword').value='';
+   document.getElementById('taNewPassword').value='';document.getElementById('taConfirmPassword').value='';
+   msg.textContent='Contraseña actualizada. Ingresá con tu nueva contraseña.';
+  }catch(err){msg.textContent='No se pudo cambiar la contraseña: '+errorText(err)}
+  finally{button.disabled=false}
  });
  document.getElementById('taLogout').addEventListener('click',async()=>{
   if(dirty||writing){alert('Hay cambios sin sincronizar. Esperá a que aparezca «Guardado en la nube» antes de salir.');return;}
