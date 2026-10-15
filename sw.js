@@ -1,4 +1,4 @@
-const CACHE_NAME = "trayectoriapp-v15";
+const CACHE_NAME = "trayectoriapp-v16";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./trayectoriapp-logo.png"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(FILES)));
