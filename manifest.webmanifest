@@ -1,0 +1,11 @@
+{
+  "name": "TrayectoriApp",
+  "short_name": "TrayectoriApp",
+  "description": "Seguimiento personal de trayectorias educativas",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#17365a",
+  "icons": [{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
