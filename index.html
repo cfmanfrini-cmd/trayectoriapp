@@ -344,9 +344,12 @@ function askInstanceDetails(current){
  if(titleRaw===null)return null;
  const title=titleRaw.trim();
  if(!title||title.length>15)return alert('El nombre debe tener entre 1 y 15 caracteres. No se guardaron cambios.'),null;
- const date=prompt('Fecha (AAAA-MM-DD):',current?.date||today());
- if(date===null)return null;
- if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||Number.isNaN(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date)return alert('Fecha inválida. No se guardaron cambios.'),null;
+ const rawDate=prompt('Fecha (DD/MM/AAAA o AAAA-MM-DD):',current?.date||today());
+ if(rawDate===null)return null;
+ const typed=rawDate.trim();
+ const match=typed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+ const date=match?`${match[3]}-${match[2].padStart(2,'0')}-${match[1].padStart(2,'0')}`:typed;
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date)return alert('Fecha inválida. No se guardaron cambios.'),null;
  return {type,title,date};
 }
 $('newMatrixInstance').addEventListener('click',()=>{
