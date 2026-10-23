@@ -380,23 +380,33 @@ function reportSummaryHtml(courseId){
  const doc=new DOMParser().parseFromString(original,'text/html');
  const students=data.students.filter(st=>st.courseId===courseId).sort((a,b)=>a.name.localeCompare(b.name,'es'));
  const first=matrixInstances(courseId,'1C'),second=matrixInstances(courseId,'2C');
- const instances=[...first,...second];
+ const groups=[
+   {period:'1C',instances:first,closures:[['advance1','1.er informe de avance'],['quarter1','Nota 1.er cuatrimestre']],css:'q1'},
+   {period:'2C',instances:second,closures:[['advance2','2.º informe de avance'],['quarter2','Nota 2.º cuatrimestre']],css:'q2'}
+ ];
  const table=doc.createElement('table');table.className='summary-table';
- const th=(label,span=1)=>{const e=doc.createElement('th');e.textContent=label;if(span>1)e.colSpan=span;return e};
+ const th=(label,span=1,cls='')=>{const e=doc.createElement('th');e.textContent=label;if(span>1)e.colSpan=span;if(cls)e.className=cls;return e};
  const thead=doc.createElement('thead'),group=doc.createElement('tr'),headers=doc.createElement('tr');
- group.append(th('Estudiantes'),th('1.er cuatrimestre',Math.max(first.length,1)),th('2.º cuatrimestre',Math.max(second.length,1)),th('Asistencia anual'));
+ group.append(th('Estudiantes'),...groups.map(g=>th(g.period==='1C'?'1.er cuatrimestre':'2.º cuatrimestre',g.instances.length+g.closures.length,g.css)),th('Asistencia anual'));
  headers.append(th('Apellido y nombre'));
- for(const period of [first,second]){if(!period.length)headers.append(th('Sin instancias'));else period.forEach(ins=>headers.append(th((ins.title||ins.type||'Evaluación')+(ins.date?' · '+ins.date:''))))}
+ for(const g of groups){
+   g.instances.forEach(ins=>headers.append(th(ins.title||ins.type||'Evaluación',1,g.css)));
+   g.closures.forEach(([key,label])=>headers.append(th(label,1,g.css)));
+ }
  headers.append(th('% asistencia'));
  thead.append(group,headers);table.append(thead);
  const tbody=doc.createElement('tbody');
  students.forEach(st=>{
-   const row=doc.createElement('tr'),cell=(v)=>{const td=doc.createElement('td');td.textContent=v;row.append(td)};
+   const row=doc.createElement('tr'),cell=(v,cls='')=>{const td=doc.createElement('td');td.textContent=v;if(cls)td.className=cls;row.append(td)};
    cell(st.name);
-   for(const period of [first,second]){if(!period.length){cell('—');continue;}for(const ins of period){
-     const grade=data.grades.find(g=>g.courseId===courseId&&g.studentId===st.id&&g.period===ins.period&&g.date===ins.date&&g.type===ins.type&&g.title===ins.title);
-     cell(grade?(grade.absence==='A'?'A':String(grade.value??'').trim()||'—'):'—');
-   }}
+   const closure=getClosure(courseId,st.id)||{};
+   for(const g of groups){
+     for(const ins of g.instances){
+       const grade=data.grades.find(x=>x.courseId===courseId&&x.studentId===st.id&&x.period===ins.period&&x.date===ins.date&&x.type===ins.type&&x.title===ins.title);
+       cell(grade?(grade.absence==='A'?'A':String(grade.value??'').trim()||'—'):'—',g.css);
+     }
+     for(const [key] of g.closures)cell(String(closure[key]??'').trim()||'—',g.css);
+   }
    const a=attendanceCounts(courseId,st.id,'1C'),b=attendanceCounts(courseId,st.id,'2C');
    const marked=a.marked+b.marked,present=a.present+a.late+b.present+b.late;
    cell(marked?Math.round(100*present/marked)+' %':'Sin datos');tbody.append(row);
@@ -415,7 +425,7 @@ function reportSummaryHtml(courseId){
  const title2=doc.createElement('div');title2.textContent='Licenciado en Gestión de las Instituciones Educativas';
  sign.append(img,name,title1,title2);wrapper.append(sign);
  footer.before(wrapper);
- const css=doc.createElement('style');css.textContent='@page{size:A4 landscape;margin:11mm 9mm} .summary-table{font-size:7.5pt;table-layout:auto} .summary-table th,.summary-table td{padding:4px;overflow-wrap:anywhere;text-align:center} .summary-table td:first-child,.summary-table th:first-child{text-align:left;min-width:115px} .summary-table thead tr:first-child th{background:#d9e6f4;color:#17365a} .summary-table thead{display:table-header-group} .summary-section{break-inside:auto}.summary-note{font-size:8pt;color:#66768b;margin-top:10px}.report-signature{margin:25px 0 12px auto;width:300px;text-align:center;break-inside:avoid;font-size:9pt}.report-signature img{display:block;object-fit:contain;width:170px;height:95px;margin:0 auto -3px}.report-signature strong{display:block;font-size:11pt}';doc.head.append(css);
+ const css=doc.createElement('style');css.textContent='@page{size:A4 landscape;margin:11mm 9mm} .summary-table{font-size:7.5pt;table-layout:auto} .summary-table th,.summary-table td{padding:4px;overflow-wrap:anywhere;text-align:center} .summary-table td:first-child,.summary-table th:first-child{text-align:left;min-width:115px} .summary-table thead tr:first-child th{background:#eee9dc;color:#4d443b}.summary-table th.q1,.summary-table td.q1{background:#f7e9ef;color:#49313c}.summary-table th.q2,.summary-table td.q2{background:#f5edda;color:#504331}.summary-table thead tr:first-child th.q1{background:#ead4df}.summary-table thead tr:first-child th.q2{background:#eaddbd} .summary-table thead{display:table-header-group} .summary-section{break-inside:auto}.summary-note{font-size:8pt;color:#66768b;margin-top:10px}.report-signature{margin:25px 0 12px auto;width:300px;text-align:center;break-inside:avoid;font-size:9pt}.report-signature img{display:block;object-fit:contain;width:260px;height:145px;margin:0 auto -3px}.report-signature strong{display:block;font-size:11pt}';doc.head.append(css);
  return '<!doctype html>\n'+doc.documentElement.outerHTML;
 }
 function openPrintableReport(){
